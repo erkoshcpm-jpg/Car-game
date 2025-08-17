@@ -1,0 +1,539 @@
+
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Қарапайым Машина Ойыны</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #0b0e14;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    touch-action: none; /* prevent default gestures */
+  }
+  #game {
+    position: absolute;
+    inset: 0;
+  }
+  /* HUD */
+  #hud {
+    position: absolute;
+    top: 10px; left: 10px; right: 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    pointer-events: none;
+    color: #f0f0f0;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    font-weight: 600;
+  }
+  .chip {
+    background: rgba(0,0,0,0.35);
+    padding: 8px 12px;
+    border-radius: 12px;
+    backdrop-filter: blur(6px);
+  }
+  /* Controls */
+  #controls {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 34vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+  .pad {
+    border-radius: 16px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 12px;
+  }
+  .btn {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    font-size: 16px;
+    box-shadow: inset 0 0 24px rgba(255,255,255,0.06);
+  }
+  .btn.active { background: rgba(255,255,255,0.18); }
+  .full { grid-column: span 2; }
+  #pauseBtn {
+    position: absolute; top: 10px; right: 10px;
+    pointer-events: auto;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    font-weight: 700;
+  }
+  #menu {
+    position: absolute; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+  }
+  #menu .card {
+    background: #121722;
+    color: #e8ecf1;
+    padding: 20px;
+    border-radius: 16px;
+    width: min(520px, 92vw);
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+  }
+  #menu h1 { margin: 0 0 6px 0; font-size: 24px; }
+  #menu p { opacity: 0.85; }
+  #menu .row {
+    display: flex; gap: 10px; justify-content: center; margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  #menu button {
+    padding: 10px 16px; border-radius: 12px; border: none; font-weight: 700;
+  }
+  #menu .primary {
+    background: #2b6fff; color: #fff;
+  }
+  #menu .ghost {
+    background: transparent; color: #b8c4d6; border: 1px solid #2b6fff66;
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <div class="chip">Ұпай: <span id="score">0</span></div>
+  <div class="chip">Жылдамдық: <span id="speed">0</span> км/сағ</div>
+</div>
+
+<button id="pauseBtn">Пауза ⏸</button>
+
+<div id="controls" aria-hidden="false">
+  <div class="pad" id="steerPad" aria-label="Steering">
+    <div class="btn" id="leftBtn">◀️ Солға</div>
+    <div class="btn" id="rightBtn">Оңға ▶️</div>
+    <div class="btn full" id="centerBtn">Орталау</div>
+  </div>
+  <div class="pad" id="drivePad" aria-label="Drive">
+    <div class="btn" id="brakeBtn">🛑 Тежеу</div>
+    <div class="btn" id="gasBtn">Газ ⛽️</div>
+    <div class="btn full" id="boostBtn">Буст ⚡️</div>
+  </div>
+</div>
+
+<div id="menu">
+  <div class="card">
+    <h1>Қарапайым Машина Ойыны</h1>
+    <p>Солға/оңға бұрып, газ/тежегішті қолданып кедергілерден қаш. Құласаң – қайта бастай бер!</p>
+    <div class="row">
+      <button class="primary" id="playBtn">Ойынды бастау</button>
+      <button class="ghost" id="howBtn">Басқару</button>
+    </div>
+    <div id="how" style="display:none; text-align:left; margin-top:12px;">
+      <ul>
+        <li>Сол жақ панель: ◀️/▶️ бұрылу, «Орталау» — машинаны жол ортасына қайтарады.</li>
+        <li>Оң жақ панель: ⛽️ Газ, 🛑 Тежегіш, ⚡️ Буст — қысқа уақыт тездетеді.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+
+  let W = 0, H = 0;
+  function resize() {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize, {passive:true});
+  resize();
+
+  // Game state
+  let running = false;
+  let gameOver = false;
+  let score = 0;
+  let speed = 0;        // world speed (px/s)
+  let targetSpeed = 0;  // desired speed
+  const MAX_SPEED = 520; // px/s
+  const KMH_FACTOR = 1.8; // rough conversion for HUD
+  const ACCEL = 420;    // px/s^2
+  const BRAKE = 680;    // px/s^2
+  const FRICTION = 220; // px/s^2 natural slowdown
+  const STEER_SPEED = 420; // lateral px/s at full steer
+  const BOOST_SPEED = 820;
+  const BOOST_TIME = 1000; // ms
+
+  // Road layout
+  const laneCount = 3;
+  let roadWidth; // computed per resize
+  let laneW;
+  let roadX;
+
+  function layoutRoad() {
+    roadWidth = Math.min(520, W * 0.72);
+    laneW = roadWidth / laneCount;
+    roadX = (W - roadWidth) / 2;
+  }
+  layoutRoad();
+
+  // Player
+  const car = {
+    x: 0, y: 0, w: 42, h: 78, lane: 1, vx: 0, color: '#3ad1ff'
+  };
+  function resetPlayer() {
+    car.w = Math.max(36, Math.min(56, laneW * 0.6));
+    car.h = car.w * 1.8;
+    car.x = roadX + car.lane * laneW + (laneW - car.w)/2;
+    car.y = H - car.h - 40;
+    car.vx = 0;
+  }
+  resetPlayer();
+
+  // AI cars (obstacles)
+  const bots = [];
+  function spawnBot() {
+    const lane = Math.floor(Math.random()*laneCount);
+    const bw = Math.max(34, laneW * (0.5 + Math.random()*0.25));
+    const bh = bw * (1.6 + Math.random()*0.4);
+    const x = roadX + lane * laneW + (laneW - bw)/2;
+    const y = -bh - Math.random()*H*0.4;
+    const speedMul = 0.6 + Math.random()*0.7;
+    const color = ['#ff6b6b','#ffd93a','#6bff8d','#9d7bff','#ff9ef3'][Math.floor(Math.random()*5)];
+    bots.push({x, y, w: bw, h: bh, vy: (200+Math.random()*120)*speedMul, lane, color});
+  }
+
+  // City decorations: buildings and trees on sides
+  const decor = [];
+  function spawnDecor() {
+    const sideW = (W - roadWidth)/2;
+    const y = -100 - Math.random()*200;
+    const isLeft = Math.random()<0.5;
+    const w = 30 + Math.random()* (sideW*0.6);
+    const h = 60 + Math.random()* 120;
+    const x = isLeft ? (sideW - w - 12) : (W - sideW + 12);
+    const color = isLeft ? '#263248' : '#2a2f3f';
+    decor.push({x, y, w, h, vy: 120 + Math.random()*80, color, type:'bld'});
+  }
+
+  // Controls state
+  const keys = { left:false, right:false, gas:false, brake:false };
+  let boosting = false;
+  let boostUntil = 0;
+
+  // Touch buttons
+  const btns = {
+    left: document.getElementById('leftBtn'),
+    right: document.getElementById('rightBtn'),
+    gas: document.getElementById('gasBtn'),
+    brake: document.getElementById('brakeBtn'),
+    boost: document.getElementById('boostBtn'),
+    center: document.getElementById('centerBtn'),
+  };
+  function bindBtn(el, key) {
+    const on = () => { if(key) { keys[key] = true; } el.classList.add('active'); };
+    const off = () => { if(key) { keys[key] = false; } el.classList.remove('active'); };
+    el.addEventListener('touchstart', (e)=>{ e.preventDefault(); on(); }, {passive:false});
+    el.addEventListener('touchend', (e)=>{ e.preventDefault(); off(); }, {passive:false});
+    el.addEventListener('touchcancel', (e)=>{ e.preventDefault(); off(); }, {passive:false});
+    el.addEventListener('mousedown', (e)=>{ e.preventDefault(); on(); });
+    el.addEventListener('mouseup', (e)=>{ e.preventDefault(); off(); });
+    el.addEventListener('mouseleave', (e)=>{ e.preventDefault(); off(); });
+  }
+  bindBtn(btns.left, 'left');
+  bindBtn(btns.right, 'right');
+  bindBtn(btns.gas, 'gas');
+  bindBtn(btns.brake, 'brake');
+  btns.center.addEventListener('click', ()=>{
+    // Snap to nearest lane center
+    const targetX = roadX + Math.round((car.x - roadX + car.w/2)/laneW)*laneW + (laneW - car.w)/2;
+    car.x = targetX;
+    car.vx = 0;
+  });
+  btns.boost.addEventListener('touchstart', ()=>{
+    if(!boosting) {
+      boosting = true;
+      boostUntil = performance.now() + BOOST_TIME;
+      targetSpeed = Math.min(BOOST_SPEED, MAX_SPEED*1.2);
+    }
+  }, {passive:true});
+  btns.boost.addEventListener('mousedown', ()=>{
+    if(!boosting) {
+      boosting = true;
+      boostUntil = performance.now() + BOOST_TIME;
+      targetSpeed = Math.min(BOOST_SPEED, MAX_SPEED*1.2);
+    }
+  });
+
+  // Keyboard (desktop testing)
+  window.addEventListener('keydown', (e)=>{
+    if(e.key==='ArrowLeft') keys.left=true;
+    if(e.key==='ArrowRight') keys.right=true;
+    if(e.key==='ArrowUp') keys.gas=true;
+    if(e.key==='ArrowDown') keys.brake=true;
+    if(e.key===' ') { boosting = true; boostUntil = performance.now()+BOOST_TIME; targetSpeed = Math.min(BOOST_SPEED, MAX_SPEED*1.2); }
+  });
+  window.addEventListener('keyup', (e)=>{
+    if(e.key==='ArrowLeft') keys.left=false;
+    if(e.key==='ArrowRight') keys.right=false;
+    if(e.key==='ArrowUp') keys.gas=false;
+    if(e.key==='ArrowDown') keys.brake=false;
+  });
+
+  // Menu & pause
+  const menu = document.getElementById('menu');
+  const playBtn = document.getElementById('playBtn');
+  const howBtn = document.getElementById('howBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const how = document.getElementById('how');
+  playBtn.addEventListener('click', startGame);
+  howBtn.addEventListener('click', ()=>{
+    how.style.display = how.style.display === 'none' ? 'block' : 'none';
+  });
+  pauseBtn.addEventListener('click', ()=>{
+    if(!running) return;
+    running = false;
+    menu.style.display = 'flex';
+  });
+
+  function startGame() {
+    score = 0;
+    speed = 0; targetSpeed = 0;
+    bots.length = 0; decor.length = 0;
+    car.lane = 1; layoutRoad(); resetPlayer();
+    for(let i=0;i<8;i++) spawnBot();
+    for(let i=0;i<12;i++) spawnDecor();
+    running = true; gameOver = false;
+    last = performance.now();
+    menu.style.display='none';
+    document.getElementById('score').textContent = '0';
+    document.getElementById('speed').textContent = '0';
+  }
+
+  // Initial menu visible
+  menu.style.display = 'flex';
+
+  // Game loop
+  let last = performance.now();
+  function loop(t) {
+    requestAnimationFrame(loop);
+    const dt = Math.min(0.033, (t-last)/1000);
+    last = t;
+    draw(dt);
+  }
+  requestAnimationFrame(loop);
+
+  function update(dt) {
+    // Speed control
+    if(keys.gas) targetSpeed = Math.min(MAX_SPEED, targetSpeed + ACCEL*dt);
+    else targetSpeed = Math.max(0, targetSpeed - FRICTION*dt);
+    if(keys.brake) targetSpeed = Math.max(0, targetSpeed - BRAKE*dt);
+
+    if(boosting && tNow() > boostUntil) {
+      boosting = false;
+      targetSpeed = Math.min(MAX_SPEED, targetSpeed);
+    }
+
+    // Approach target speed smoothly
+    const ds = targetSpeed - speed;
+    const step = (ds>0? ACCEL: BRAKE) * dt;
+    if(Math.abs(ds) < step) speed = targetSpeed; else speed += Math.sign(ds)*step;
+
+    // Steering
+    let steer = 0;
+    if(keys.left) steer -= 1;
+    if(keys.right) steer += 1;
+    car.x += steer * STEER_SPEED * dt;
+
+    // Clamp to road
+    const minX = roadX + 6;
+    const maxX = roadX + roadWidth - car.w - 6;
+    if(car.x < minX) car.x = minX;
+    if(car.x > maxX) car.x = maxX;
+
+    // Move world (bots & decor descend)
+    const worldVy = speed * dt;
+    for (const b of bots) {
+      b.y += worldVy + b.vy*dt*0.25; // relative motion
+      if (b.y > H + 40) {
+        // Respawn above
+        b.y = -b.h - Math.random()*200;
+        b.lane = Math.floor(Math.random()*laneCount);
+        b.x = roadX + b.lane * laneW + (laneW - b.w)/2;
+      }
+      // Collision
+      if (rectsOverlap(car, b, 6)) {
+        crash();
+      }
+    }
+
+    for (const d of decor) {
+      d.y += worldVy * 0.6 + d.vy*dt*0.2;
+      if (d.y > H + 60) {
+        d.y = -d.h - Math.random()*200;
+        d.x = (Math.random()<0.5) ? ( (W-roadWidth)/2 - d.w - 12 ) : ( W - (W-roadWidth)/2 + 12 );
+        d.w = 30 + Math.random()* ((W-roadWidth)/2 *0.6);
+        d.h = 60 + Math.random()* 120;
+      }
+    }
+
+    // Score
+    score += speed * dt * 0.05;
+    document.getElementById('score').textContent = Math.floor(score).toString();
+    document.getElementById('speed').textContent = Math.round(speed*KMH_FACTOR).toString();
+  }
+
+  function draw(dt) {
+    // background & pause/gameover
+    ctx.clearRect(0,0,W,H);
+
+    // Parallax sky
+    const grad = ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0, '#0b0e14');
+    grad.addColorStop(1, '#101827');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,W,H);
+
+    // Side "city" ground
+    ctx.fillStyle = '#0e1421';
+    ctx.fillRect(0,0,(W-roadWidth)/2,H);
+    ctx.fillRect(W-(W-roadWidth)/2,0,(W-roadWidth)/2,H);
+
+    // Buildings/trees
+    for (const d of decor) {
+      ctx.fillStyle = d.color;
+      ctx.fillRect(d.x, d.y, d.w, d.h);
+      // small windows
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      for (let yy=d.y+8; yy<d.y+d.h-8; yy+=12) {
+        ctx.fillRect(d.x+8, yy, Math.max(2,d.w*0.6), 4);
+      }
+    }
+
+    // Road
+    drawRoad(ctx);
+
+    // Bots
+    for (const b of bots) {
+      drawCar(ctx, b.x, b.y, b.w, b.h, b.color);
+    }
+
+    // Player
+    drawCar(ctx, car.x, car.y, car.w, car.h, car.color, true);
+
+    if (running) update(dt);
+  }
+
+  function drawRoad(ctx) {
+    // asphalt
+    ctx.fillStyle = '#1e2738';
+    ctx.fillRect(roadX, 0, roadWidth, H);
+
+    // lane lines (moving dashed effect)
+    const dashH = 34;
+    const gapH = 26;
+    const offset = (performance.now()/8) % (dashH + gapH);
+    ctx.fillStyle = '#e6edf999';
+    for (let i=1; i<laneCount; i++) {
+      const x = roadX + i * laneW - 2;
+      for (let y=-dashH; y<H; y += dashH + gapH) {
+        ctx.fillRect(x, y + offset, 4, dashH);
+      }
+    }
+
+    // road borders
+    ctx.fillStyle = '#c4d1ff55';
+    ctx.fillRect(roadX-6, 0, 6, H);
+    ctx.fillRect(roadX+roadWidth, 0, 6, H);
+  }
+
+  function drawCar(ctx, x, y, w, h, color, isPlayer=false) {
+    ctx.save();
+    ctx.translate(x, y);
+    // body
+    ctx.fillStyle = color;
+    roundRect(ctx, 0, 0, w, h, 8, true);
+    // windows
+    ctx.fillStyle = isPlayer ? '#ffffffcc' : '#dbe3ff99';
+    roundRect(ctx, w*0.15, h*0.12, w*0.7, h*0.26, 6, true);
+    roundRect(ctx, w*0.15, h*0.62, w*0.7, h*0.2, 6, true);
+    // wheels
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(-3, h*0.18, 6, h*0.22);
+    ctx.fillRect(-3, h*0.62, 6, h*0.22);
+    ctx.fillRect(w-3, h*0.18, 6, h*0.22);
+    ctx.fillRect(w-3, h*0.62, 6, h*0.22);
+    // glow for player
+    if(isPlayer) {
+      ctx.globalAlpha = 0.2;
+      ctx.fillStyle = '#3ad1ff';
+      ctx.fillRect(-12, h*0.2, w+24, h*0.6);
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  function roundRect(ctx, x, y, w, h, r, fill) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+    if(fill) ctx.fill();
+  }
+
+  function rectsOverlap(a, b, pad=0) {
+    return !(a.x+pad > b.x + b.w - pad ||
+             a.x + a.w - pad < b.x + pad ||
+             a.y+pad > b.y + b.h - pad ||
+             a.y + a.h - pad < b.y + pad);
+  }
+
+  function crash() {
+    running = false;
+    gameOver = true;
+    setTimeout(()=>{
+      const title = document.querySelector('#menu h1');
+      title.textContent = 'Қақтығыс! 😵';
+      document.querySelector('#menu p').textContent = 'Ұпай: ' + Math.floor(score) + '. Тағы да көресің бе?';
+      document.getElementById('playBtn').textContent = 'Қайта бастау';
+      menu.style.display = 'flex';
+    }, 80);
+  }
+
+  function tNow(){ return performance.now(); }
+
+  // Keep layout in sync on orientation change
+  window.addEventListener('orientationchange', ()=>{
+    setTimeout(()=>{ resize(); layoutRoad(); resetPlayer(); }, 120);
+  });
+})();
+</script>
+</body>
+</html>
